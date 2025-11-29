@@ -8,9 +8,7 @@ defmodule NimbleZTA.GoogleIAPTest do
   @fields [:id, :name, :email]
   @name Context.Test.GoogleIAP
 
-  setup do
-    bypass = Bypass.open()
-
+  def json_key(conn, _) do
     key = %{
       "kty" => "RSA",
       "e" => "AQAB",
@@ -21,6 +19,21 @@ defmodule NimbleZTA.GoogleIAPTest do
         "qvMgmj7GrjMAKxib9ODcdNyMwhsU1jwjvyAANrCJ5n1UcM82lZ5B3YP13zbPY3vRuufkW_GuA2cEZ8htMGT79kMsPz1cLrwIeUNOdGzncQQvBJVmQgw8NOuflVy5OajvfSe4a5PQmpC6BEp1d-Ix0S4BV2vWJUb0UtHg3bM4GgHTrnhHkSyXfpSZT4SNqnSOtiXiD-7lue52cPlZotkeTR2D4LTVSrsCdp21wGvAxXqnfpRcKYs5EyEmyTQ85zak7nBAReMrAqrRilXej8qTWGGIg1TRILvoCMd3nF5QjcjRCx2JMMHXG4tZNoK4QbEQlsdcd45B1VpE15TwgNTx4Q"
     }
 
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(200, JSON.encode!(%{keys: [key]}))
+  end
+
+  def invalid_key(conn, _) do
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(200, JSON.encode!(%{keys: ["invalid_key"]}))
+  end
+
+  @moduletag bypass: &__MODULE__.json_key/2
+  setup {TestHelper, :bypass}
+
+  setup context do
     token =
       "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiZW1haWwiOiJ0dWthQHBlcmFsdGEuY29tIiwiaWF0IjoxNTE2MjM5MDIyLCJpc3MiOiJsaXZlYm9vayIsImF1ZCI6ImxpdmVib29rd2ViIn0.ZP5LIrkfMHq2p8g3SMgC7RBt7899GeHkP9rzYKM3RvjDCBeYoxpeioLW2sXMT74QyJPxB4JUujRU3shSPIWNAxkjJVaBGwVTqsO_PR34DSx82q45qSkUnkSVXLl-2KgN4BoUUK7dmocP6yzhNQ3XGf6669n5UG69eMZdh9PApZ7GuyRUQ80ubpvakWaIpd9PIaORkptqDWVbyOIk3Z79AMUub0MSG1FpzYByAQoLswob24l2xVo95-aQrdatqLk1sJ43AZ6HLoMxkZkWobYYRMH5w65MkQckJ9NzI3Rk-VOUlg9ePo8OPRnvcGY-OozHXrjdzn2-j03xuP6x1J3Y7Q"
 
@@ -29,19 +42,12 @@ defmodule NimbleZTA.GoogleIAPTest do
       custom_identity: %{
         iss: "livebook",
         key: "livebookweb",
-        certs: "http://localhost:#{bypass.port}"
+        certs: "http://localhost:#{context.port}"
       }
     ]
 
-    Bypass.expect(bypass, fn conn ->
-      conn
-      |> put_resp_content_type("application/json")
-      |> send_resp(200, JSON.encode!(%{keys: [key]}))
-    end)
-
     conn = conn(:get, "/") |> put_req_header("x-goog-iap-jwt-assertion", token)
-
-    {:ok, bypass: bypass, token: token, options: options, conn: conn}
+    {:ok, token: token, options: options, conn: conn}
   end
 
   test "returns the user when it's valid", %{options: options, conn: conn} do
@@ -80,15 +86,9 @@ defmodule NimbleZTA.GoogleIAPTest do
     assert {_conn, nil} = GoogleIAP.authenticate(@name, conn, fields: @fields)
   end
 
-  test "returns nil when the key is invalid", %{bypass: bypass, options: options, conn: conn} do
-    Bypass.expect_once(bypass, fn conn ->
-      conn
-      |> put_resp_content_type("application/json")
-      |> send_resp(200, JSON.encode!(%{keys: ["invalid_key"]}))
-    end)
-
+  @tag bypass: &__MODULE__.invalid_key/2
+  test "returns nil when the key is invalid", %{options: options, conn: conn} do
     start_supervised!({GoogleIAP, options})
-
     assert {_conn, nil} = GoogleIAP.authenticate(@name, conn, fields: @fields)
   end
 end

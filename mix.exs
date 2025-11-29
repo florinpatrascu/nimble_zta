@@ -35,7 +35,6 @@ defmodule NimbleZTA.MixProject do
       {:plug, "~> 1.18"},
       {:req, "~> 0.5"},
       {:jose, "~> 1.11"},
-      {:bypass, "~> 2.1", only: :test},
       {:bandit, "~> 1.0", only: :test},
       {:ex_doc, ">= 0.0.0", only: :docs}
     ]

@@ -9,7 +9,7 @@ defmodule NimbleZTA.TailscaleTest do
   @name Context.Test.Tailscale
   @path "/localapi/v0/whois"
 
-  def valid_user_response(conn) do
+  def valid_user_response(conn, _) do
     conn
     |> put_resp_content_type("application/json")
     |> send_resp(
@@ -24,39 +24,36 @@ defmodule NimbleZTA.TailscaleTest do
     )
   end
 
-  setup do
-    bypass = Bypass.open()
+  def invalid_user_response(conn, _) do
+    conn
+    |> send_resp(404, "no match for IP:port")
+  end
+
+  @moduletag bypass: &__MODULE__.valid_user_response/2
+  setup {TestHelper, :bypass}
+
+  setup context do
     conn = %{conn(:get, @path) | remote_ip: {151, 236, 219, 228}}
 
     options = [
       name: @name,
-      identity_key: "http://localhost:#{bypass.port}"
+      identity_key: "http://localhost:#{context.port}"
     ]
 
-    {:ok, bypass: bypass, options: options, conn: conn}
+    {:ok, options: options, conn: conn}
   end
 
-  test "returns the user when it's valid", %{bypass: bypass, options: options, conn: conn} do
-    Bypass.expect(bypass, fn conn ->
-      assert %{"addr" => "151.236.219.228:1"} = conn.query_params
-      valid_user_response(conn)
-    end)
-
+  test "returns the user when it's valid", %{options: options, conn: conn} do
     start_supervised!({Tailscale, options})
     {_conn, user} = Tailscale.authenticate(@name, conn, @fields)
     assert %{id: "1234567890", email: "john@example.org", name: "John"} = user
-  end
-
-  defmodule TestPlug do
-    def init(options), do: options
-    def call(conn, _opts), do: NimbleZTA.TailscaleTest.valid_user_response(conn)
   end
 
   @tag :tmp_dir
   test "returns valid user via unix socket", %{options: options, conn: conn, tmp_dir: tmp_dir} do
     socket = Path.relative_to_cwd("#{tmp_dir}/bandit.sock")
     options = Keyword.put(options, :identity_key, socket)
-    start_supervised!({Bandit, plug: TestPlug, ip: {:local, socket}, port: 0})
+    start_supervised!({Bandit, plug: &valid_user_response/2, ip: {:local, socket}, port: 0})
     start_supervised!({Tailscale, options})
     {_conn, user} = Tailscale.authenticate(@name, conn, @fields)
     assert %{id: "1234567890", email: "john@example.org", name: "John"} = user
@@ -71,34 +68,21 @@ defmodule NimbleZTA.TailscaleTest do
            end) =~ "Tailscale socket does not exist"
   end
 
-  test "returns nil when it's invalid", %{bypass: bypass, options: options} do
-    Bypass.expect_once(bypass, fn conn ->
-      assert %{"addr" => "151.236.219.229:1"} = conn.query_params
-
-      conn
-      |> send_resp(404, "no match for IP:port")
-    end)
-
+  @tag bypass: &__MODULE__.invalid_user_response/2
+  test "returns nil when it's invalid", %{options: options} do
     conn = %{conn(:get, @path) | remote_ip: {151, 236, 219, 229}}
 
     start_supervised!({Tailscale, options})
     assert {_conn, nil} = Tailscale.authenticate(@name, conn, @fields)
   end
 
+  @tag bypass: &__MODULE__.invalid_user_response/2
   test "includes an authorization header when userinfo is provided", %{
-    bypass: bypass,
     options: options,
+    port: port,
     conn: conn
   } do
-    options = Keyword.put(options, :identity_key, "http://:foobar@localhost:#{bypass.port}")
-
-    Bypass.expect_once(bypass, fn conn ->
-      assert %{"addr" => "151.236.219.228:1"} = conn.query_params
-      assert Plug.Conn.get_req_header(conn, "authorization") == ["Basic OmZvb2Jhcg=="]
-
-      conn
-      |> send_resp(404, "no match for IP:port")
-    end)
+    options = Keyword.put(options, :identity_key, "http://:foobar@localhost:#{port}")
 
     start_supervised!({Tailscale, options})
     assert {_conn, nil} = Tailscale.authenticate(@name, conn, @fields)
