@@ -1,6 +1,6 @@
 # NimbleZTA
 
-Add [Zero Trust](https://learn.microsoft.com/en-us/security/zero-trust/zero-trust-overview) Authentication (ZTA) to your Plug/Phoenix web apps. In a nutshell, if you are running applications inside your private cloud, you can use your cloud provider to identify and control access to your app, so you can focus on your application logic.
+Add [Zero Trust](https://learn.microsoft.com/en-us/security/zero-trust/zero-trust-overview) Auth (ZTA) to your Plug/Phoenix web apps. In a nutshell, if you are running applications inside your private cloud, you can use your cloud provider to identify and control access to your app, so you can focus on your application logic.
 
 `nimble_zta` is a collection of strategies for different providers. CloudFlare, Google Cloud Platform, and Tailscale are currently supported, with additional HTTP Basic Auth and Pass Through strategies available for development and testing. [Read the docs for more information](https://hexdocs.pm/nimble_zta).
 
@@ -30,7 +30,7 @@ All nimble libraries by Dashbit:
   * [NimblePool](https://github.com/dashbitco/nimble_pool) - tiny resource-pool implementation
   * [NimblePublisher](https://github.com/dashbitco/nimble_publisher) - a minimal filesystem-based publishing engine with Markdown support and code highlighting
   * [NimbleTOTP](https://github.com/dashbitco/nimble_totp) - tiny library for generating time-based one time passwords (TOTP)
-  * [NimbleZTA](https://github.com/dashbitco/nimble_zta) - add Zero Trust Authentication (ZTA) to web apps running in your private cloud
+  * [NimbleZTA](https://github.com/dashbitco/nimble_zta) - add Zero Trust Auth (ZTA) to web apps running in your private cloud
 
 ## License
 
